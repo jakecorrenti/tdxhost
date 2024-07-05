@@ -151,7 +151,32 @@ pub fn check_bios_tme_bypass() {
     println!("\tIt's better to enable TME Bypass for traditional non-confidential workloads.");
 }
 
-pub fn check_bios_tme_mt() {}
+pub fn check_bios_tme_mt() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("1:1")
+        .arg("0x982")
+        .output()
+        .expect("rdmsr command failed");
+
+    report_results(
+        if output.stdout == "1\n".as_bytes() {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: TME-MT/TME-MK (required & manually)",
+        "The bit 1 of MSR 0x982 should be 1",
+        TestOptionalState::Required,
+        None,
+    );
+
+    println!("\tPlease check your BIOS settings:");
+    println!("\t\tSocket Configuration -> Processor Configuration -> TME, TME-MT, TDX");
+    println!("\t\t\tTotal Memory Encryption Multi-Tenant (TME-MT) should be Enable");
+    println!("\t\tA different BIOS might have a different path for this setting.");
+}
 
 pub fn check_bios_enabling_tdx() {}
 
@@ -227,5 +252,10 @@ mod tests {
     #[test]
     fn test_check_bios_tme_bypass() {
         check_bios_tme_bypass();
+    }
+
+    #[test]
+    fn test_check_bios_tme_mt() {
+        check_bios_tme_mt();
     }
 }
