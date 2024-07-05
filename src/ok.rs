@@ -210,7 +210,27 @@ pub fn check_bios_seam_loader() {
     );
 }
 
-pub fn check_bios_tdx_key_split() {}
+pub fn check_bios_tdx_key_split() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("50:36")
+        .arg("0x981")
+        .output()
+        .expect("rdmsr command failed");
+
+    report_results(
+        if output.stdout != "0\n".as_bytes() {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: TDX Key Split != 0 (required)",
+        "TDX Key Split should be non-zero",
+        TestOptionalState::Required,
+        None,
+    );
+}
 
 pub fn check_bios_enabling_sgx() {}
 
@@ -295,5 +315,10 @@ mod tests {
     #[test]
     fn test_check_bios_seam_loader() {
         check_bios_seam_loader();
+    }
+
+    #[test]
+    fn test_check_bios_tdx_key_split() {
+        check_bios_tdx_key_split();
     }
 }
