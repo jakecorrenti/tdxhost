@@ -122,7 +122,34 @@ pub fn check_bios_enabling_mktme() {
     );
 }
 
-pub fn check_bios_tme_bypass() {}
+pub fn check_bios_tme_bypass() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("31:31")
+        .arg("0x982")
+        .output()
+        .expect("rdmsr command failed");
+
+    let tme_bypass_enabled = output.stdout == "1\n".as_bytes();
+    report_results(
+        if tme_bypass_enabled {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: TME Bypass = Enabled (optional)",
+        "The bit 31 of MSR 0x982 should be 1",
+        TestOptionalState::Optional,
+        None,
+    );
+
+    if !tme_bypass_enabled {
+        println!("\tThe TME Bypass has not been enabled now.");
+    }
+
+    println!("\tIt's better to enable TME Bypass for traditional non-confidential workloads.");
+}
 
 pub fn check_bios_tme_mt() {}
 
@@ -195,5 +222,10 @@ mod tests {
     #[test]
     fn test_check_bios_enabling_mktme() {
         check_bios_enabling_mktme();
+    }
+
+    #[test]
+    fn test_check_bios_tme_bypass() {
+        check_bios_tme_bypass();
     }
 }
