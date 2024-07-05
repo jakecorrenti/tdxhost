@@ -200,7 +200,15 @@ pub fn check_bios_enabling_tdx() {
     );
 }
 
-pub fn check_bios_seam_loader() {}
+pub fn check_bios_seam_loader() {
+    report_results(
+        TestResult::Tbd,
+        "Check BIOS: SEAM Loader = Enabled (optional)",
+        "",
+        TestOptionalState::Optional,
+        Some(TestOperation::Manual),
+    );
+}
 
 pub fn check_bios_tdx_key_split() {}
 
@@ -282,5 +290,10 @@ mod tests {
     #[test]
     fn test_check_bios_enabling_tdx() {
         check_bios_enabling_tdx();
+    }
+
+    #[test]
+    fn test_check_bios_seam_loader() {
+        check_bios_seam_loader();
     }
 }
