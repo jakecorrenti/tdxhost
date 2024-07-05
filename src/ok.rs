@@ -1,3 +1,5 @@
+use std::process::Command;
+
 enum TestResult {
     Ok,
     Failed,
@@ -99,6 +101,27 @@ pub fn check_bios_memory_map() {
     println!("\t\tPlease skip this setting if it doesn't exist in your BIOS menu.");
 }
 
+pub fn check_bios_enabling_mktme() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("1:1")
+        .arg("0x982")
+        .output()
+        .expect("rdmsr command failed");
+    report_results(
+        if output.stdout == "1\n".as_bytes() {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: TME = Enabled (required)",
+        "The bit 1 of MSR 0x982 should be 1",
+        TestOptionalState::Required,
+        None,
+    );
+}
+
 pub fn check_bios_tme_bypass() {}
 
 pub fn check_bios_tme_mt() {}
@@ -167,5 +190,10 @@ mod tests {
     #[test]
     fn test_check_bios_memory_map() {
         check_bios_memory_map();
+    }
+
+    #[test]
+    fn test_check_bios_enabling_mktme() {
+        check_bios_enabling_mktme();
     }
 }
