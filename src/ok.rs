@@ -178,7 +178,27 @@ pub fn check_bios_tme_mt() {
     println!("\t\tA different BIOS might have a different path for this setting.");
 }
 
-pub fn check_bios_enabling_tdx() {}
+pub fn check_bios_enabling_tdx() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("11:11")
+        .arg("0x1401")
+        .output()
+        .expect("rdmsr command failed");
+
+    report_results(
+        if output.stdout == "1\n".as_bytes() {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: TDX = Enabled (required)",
+        "The bit 1| of MSR 0x1401 should be 1",
+        TestOptionalState::Required,
+        None,
+    );
+}
 
 pub fn check_bios_seam_loader() {}
 
@@ -257,5 +277,10 @@ mod tests {
     #[test]
     fn test_check_bios_tme_mt() {
         check_bios_tme_mt();
+    }
+
+    #[test]
+    fn test_check_bios_enabling_tdx() {
+        check_bios_enabling_tdx();
     }
 }
