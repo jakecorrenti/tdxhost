@@ -83,7 +83,21 @@ pub fn check_os() {
 
 pub fn check_tdx_module() {}
 
-pub fn check_bios_memory_map() {}
+pub fn check_bios_memory_map() {
+    report_results(
+        TestResult::Tbd,
+        "Check BIOS: Volatile Memory should be 1LM (optional & manually)",
+        "",
+        TestOptionalState::Optional,
+        Some(TestOperation::Manual),
+    );
+
+    println!("\tPlease check your BIOS settings:");
+    println!("\t\tSocket Configuration -> Memory Configuration -> Memory Map");
+    println!("\t\t\tVolatile Memory (or Volatile Memory Mode) should be 1LM");
+    println!("\t\tA different BIOS might have a different path for this setting.");
+    println!("\t\tPlease skip this setting if it doesn't exist in your BIOS menu.");
+}
 
 pub fn check_bios_tme_bypass() {}
 
@@ -148,5 +162,10 @@ mod tests {
     #[test]
     fn test_check_os() {
         check_os();
+    }
+
+    #[test]
+    fn test_check_bios_memory_map() {
+        check_bios_memory_map();
     }
 }
