@@ -254,7 +254,29 @@ pub fn check_bios_enabling_sgx() {
     );
 }
 
-pub fn check_bios_sgx_reg_server() {}
+pub fn check_bios_sgx_reg_server() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("27:27")
+        .arg("0xce")
+        .output()
+        .expect("rdmsr command failed");
+
+    report_results(
+        TestResult::Tbd,
+        "Check BIOS: SGX registration server (required & manually)",
+        "",
+        TestOptionalState::Required,
+        Some(TestOperation::Manual),
+    );
+
+    if output.stdout == "1\n".as_bytes() {
+        println!("\tSGX registration server is SBX");
+    } else {
+        println!("\tSGX registration server is LIV");
+    }
+}
 
 fn report_results(
     result: TestResult,
@@ -345,5 +367,10 @@ mod tests {
     #[test]
     fn test_check_bios_enabling_sgx() {
         check_bios_enabling_sgx();
+    }
+
+    #[test]
+    fn test_check_bios_sgx_reg_server() {
+        check_bios_sgx_reg_server();
     }
 }
