@@ -232,7 +232,27 @@ pub fn check_bios_tdx_key_split() {
     );
 }
 
-pub fn check_bios_enabling_sgx() {}
+pub fn check_bios_enabling_sgx() {
+    let output = Command::new("sudo")
+        .arg("rdmsr")
+        .arg("-f")
+        .arg("18:18")
+        .arg("0x3a")
+        .output()
+        .expect("rdmsr command failed");
+
+    report_results(
+        if output.stdout == "1\n".as_bytes() {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check BIOS: SGX = Enabled (required)",
+        "The bit 18 of MSR 0x3a should be 1",
+        TestOptionalState::Required,
+        None,
+    );
+}
 
 pub fn check_bios_sgx_reg_server() {}
 
@@ -320,5 +340,10 @@ mod tests {
     #[test]
     fn test_check_bios_tdx_key_split() {
         check_bios_tdx_key_split();
+    }
+
+    #[test]
+    fn test_check_bios_enabling_sgx() {
+        check_bios_enabling_sgx();
     }
 }
