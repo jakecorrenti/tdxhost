@@ -83,7 +83,33 @@ pub fn check_os() {
     println!("\tThere is no guarantee to other OS distros");
 }
 
-pub fn check_tdx_module() {}
+pub fn check_tdx_module() {
+    let dmesg_output = Command::new("sudo")
+        .arg("dmesg")
+        .output()
+        .expect("failed to run dmesg");
+
+    let dmesg_output = String::from_utf8(dmesg_output.stdout)
+        .expect("unable to convert utf8 bytes to owned String");
+
+    if dmesg_output.contains("virt/tdx: module initialized") {
+        report_results(
+            TestResult::Ok,
+            "Check TDX Module: The module is initialized (required)",
+            "",
+            TestOptionalState::Required,
+            None,
+        );
+    } else {
+        report_results(
+            TestResult::Failed,
+            "Check TDX Module: The module is initialized (required)",
+            "TDX Module is required",
+            TestOptionalState::Required,
+            None,
+        );
+    }
+}
 
 pub fn check_bios_memory_map() {
     report_results(
@@ -372,5 +398,10 @@ mod tests {
     #[test]
     fn test_check_bios_sgx_reg_server() {
         check_bios_sgx_reg_server();
+    }
+
+    #[test]
+    fn test_check_tdx_module() {
+        check_tdx_module();
     }
 }
