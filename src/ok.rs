@@ -346,6 +346,26 @@ fn report_results(
     }
 }
 
+pub fn run_all_checks() {
+    println!("Required Features & Settings");
+    println!("============================");
+    check_os();
+    check_tdx_module();
+    check_bios_enabling_mktme();
+    check_bios_tme_mt();
+    check_bios_enabling_tdx();
+    check_bios_tdx_key_split();
+    check_bios_enabling_sgx();
+    check_bios_sgx_reg_server();
+
+    println!();
+    println!("Optional Features & Settings");
+    println!("============================");
+    check_bios_memory_map();
+    check_bios_tme_bypass();
+    check_bios_seam_loader();
+}
+
 mod tests {
     #[allow(unused_imports)]
     use super::*;
