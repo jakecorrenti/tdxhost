@@ -1,3 +1,4 @@
+use msru::{Accessor, Msr};
 use std::process::Command;
 
 enum TestResult {
@@ -128,15 +129,10 @@ pub fn check_bios_memory_map() {
 }
 
 pub fn check_bios_enabling_mktme() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("1:1")
-        .arg("0x982")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x982, 0).unwrap().read().unwrap();
+
     report_results(
-        if output.stdout == "1\n".as_bytes() {
+        if msr_value & (1 << 1) > 0 {
             TestResult::Ok
         } else {
             TestResult::Failed
@@ -149,15 +145,9 @@ pub fn check_bios_enabling_mktme() {
 }
 
 pub fn check_bios_tme_bypass() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("31:31")
-        .arg("0x982")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x982, 0).unwrap().read().unwrap();
 
-    let tme_bypass_enabled = output.stdout == "1\n".as_bytes();
+    let tme_bypass_enabled = msr_value & (1 << 31) > 0;
     report_results(
         if tme_bypass_enabled {
             TestResult::Ok
@@ -178,16 +168,10 @@ pub fn check_bios_tme_bypass() {
 }
 
 pub fn check_bios_tme_mt() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("1:1")
-        .arg("0x982")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x982, 0).unwrap().read().unwrap();
 
     report_results(
-        if output.stdout == "1\n".as_bytes() {
+        if msr_value & (1 << 1) > 0 {
             TestResult::Ok
         } else {
             TestResult::Failed
@@ -205,22 +189,16 @@ pub fn check_bios_tme_mt() {
 }
 
 pub fn check_bios_enabling_tdx() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("11:11")
-        .arg("0x1401")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x1401, 0).unwrap().read().unwrap();
 
     report_results(
-        if output.stdout == "1\n".as_bytes() {
+        if msr_value & (1 << 11) > 0 {
             TestResult::Ok
         } else {
             TestResult::Failed
         },
         "Check BIOS: TDX = Enabled (required)",
-        "The bit 1| of MSR 0x1401 should be 1",
+        "The bit 11 of MSR 0x1401 should be 1",
         TestOptionalState::Required,
         None,
     );
@@ -237,16 +215,11 @@ pub fn check_bios_seam_loader() {
 }
 
 pub fn check_bios_tdx_key_split() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("50:36")
-        .arg("0x981")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x981, 0).unwrap().read().unwrap();
 
     report_results(
-        if output.stdout != "0\n".as_bytes() {
+        // check bits 50:36
+        if msr_value & (0x7fff << 36) != 0 {
             TestResult::Ok
         } else {
             TestResult::Failed
@@ -259,16 +232,10 @@ pub fn check_bios_tdx_key_split() {
 }
 
 pub fn check_bios_enabling_sgx() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("18:18")
-        .arg("0x3a")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0x3a, 0).unwrap().read().unwrap();
 
     report_results(
-        if output.stdout == "1\n".as_bytes() {
+        if msr_value & (1 << 18) > 0 {
             TestResult::Ok
         } else {
             TestResult::Failed
@@ -281,13 +248,7 @@ pub fn check_bios_enabling_sgx() {
 }
 
 pub fn check_bios_sgx_reg_server() {
-    let output = Command::new("sudo")
-        .arg("rdmsr")
-        .arg("-f")
-        .arg("27:27")
-        .arg("0xce")
-        .output()
-        .expect("rdmsr command failed");
+    let msr_value = Msr::new(0xce, 0).unwrap().read().unwrap();
 
     report_results(
         TestResult::Tbd,
@@ -297,7 +258,7 @@ pub fn check_bios_sgx_reg_server() {
         Some(TestOperation::Manual),
     );
 
-    if output.stdout == "1\n".as_bytes() {
+    if msr_value & (1 << 27) > 0 {
         println!("\tSGX registration server is SBX");
     } else {
         println!("\tSGX registration server is LIV");
