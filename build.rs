@@ -41,6 +41,8 @@ fn generate_manpages(cmd: &Command, out_dir: &Path) -> Result<(), Error> {
 }
 
 fn main() -> std::io::Result<()> {
+    println!("cargo::rerun-if-changed=src/cli.rs");
+
     let out_dir =
         std::path::PathBuf::from(std::env::var_os("OUT_DIR").ok_or(std::io::ErrorKind::NotFound)?);
     let mut cmd = cli::Cli::command();
