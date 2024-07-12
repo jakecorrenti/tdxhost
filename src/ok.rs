@@ -283,6 +283,36 @@ pub fn check_cpu_manufacturer_id() {
     );
 }
 
+pub fn check_kvm_supported() {
+    use std::os::fd::AsRawFd;
+
+    let (result, reason) = match std::fs::File::open("/dev/kvm") {
+        Ok(fd) => {
+            let api_version = unsafe { libc::ioctl(fd.as_raw_fd(), 0xAE00, 0) };
+            if api_version < 0 {
+                (
+                    TestResult::Failed,
+                    "KVM device node (/dev/kvm) should be accessible",
+                )
+            } else {
+                (TestResult::Ok, "")
+            }
+        }
+        Err(_) => (
+            TestResult::Failed,
+            "Unable to read KVM device node file (/dev/kvm)",
+        ),
+    };
+
+    report_results(
+        result,
+        "Check KVM is supported (required)",
+        reason,
+        TestOptionalState::Required,
+        None,
+    );
+}
+
 fn report_results(
     result: TestResult,
     action: &str,
@@ -337,6 +367,7 @@ pub fn run_all_checks() {
     check_bios_enabling_sgx();
     check_bios_sgx_reg_server();
     check_cpu_manufacturer_id();
+    check_kvm_supported();
 
     println!();
     println!("Optional Features & Settings");
@@ -408,5 +439,10 @@ mod tests {
     #[test]
     fn test_check_cpu_manufacturer_id() {
         check_cpu_manufacturer_id();
+    }
+
+    #[test]
+    fn test_check_kvm_supported() {
+        check_kvm_supported();
     }
 }
