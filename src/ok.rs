@@ -9,6 +9,11 @@ enum TestResult {
     Tbd,
 }
 
+pub enum KvmParameter {
+    Tdx,
+    Sgx,
+}
+
 impl From<&TestResult> for String {
     fn from(res: &TestResult) -> Self {
         match res {
@@ -265,6 +270,96 @@ pub fn check_bios_sgx_reg_server() {
     }
 }
 
+pub fn check_cpu_manufacturer_id() {
+    let res = unsafe { std::arch::x86_64::__cpuid(0x0000_0000) };
+    let name: [u8; 12] = unsafe { std::mem::transmute([res.ebx, res.edx, res.ecx]) };
+    let name = String::from_utf8(name.to_vec()).unwrap();
+
+    report_results(
+        if name == "GenuineIntel" {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check CPUID 0x0 Manufacturer ID = GenuineIntel (required)",
+        "The CPUID Manufacturer ID should be GenuineIntel",
+        TestOptionalState::Required,
+        None,
+    );
+}
+
+pub fn check_kvm_supported() {
+    use std::os::fd::AsRawFd;
+
+    let (result, reason) = match std::fs::File::open("/dev/kvm") {
+        Ok(fd) => {
+            let api_version = unsafe { libc::ioctl(fd.as_raw_fd(), 0xAE00, 0) };
+            if api_version < 0 {
+                (
+                    TestResult::Failed,
+                    "KVM device node (/dev/kvm) should be accessible",
+                )
+            } else {
+                (TestResult::Ok, "")
+            }
+        }
+        Err(_) => (
+            TestResult::Failed,
+            "Unable to read KVM device node file (/dev/kvm)",
+        ),
+    };
+
+    report_results(
+        result,
+        "Check KVM is supported (required)",
+        reason,
+        TestOptionalState::Required,
+        None,
+    );
+}
+
+pub fn check_kvm_module_supported(param: KvmParameter) {
+    let param_loc = match param {
+        KvmParameter::Tdx => "/sys/module/kvm_intel/parameters/tdx",
+        KvmParameter::Sgx => "/sys/module/kvm_intel/parameters/sgx",
+    };
+
+    let path = std::path::Path::new(param_loc);
+
+    let (result, reason) = if path.exists() {
+        match std::fs::read_to_string(param_loc) {
+            Ok(result) => {
+                if result.trim() == "1" || result.trim() == "Y" {
+                    (TestResult::Ok, String::new())
+                } else {
+                    (
+                        TestResult::Failed,
+                        format!(
+                            "Parameter file ({}) contains invalid value: {}",
+                            param_loc, result
+                        ),
+                    )
+                }
+            }
+            Err(e) => (
+                TestResult::Failed,
+                format!("Unable to read parameter file: {}", e),
+            ),
+        }
+    } else {
+        (
+            TestResult::Failed,
+            format!("Provided parameter does not exist: {}", param_loc),
+        )
+    };
+
+    let action = format!(
+        "Check /sys/module/kvm_intel/parameters/{} = Y (required)",
+        param_loc[param_loc.rfind('/').unwrap() + 1..].to_owned()
+    );
+    report_results(result, &action, &reason, TestOptionalState::Required, None);
+}
+
 fn report_results(
     result: TestResult,
     action: &str,
@@ -318,6 +413,10 @@ pub fn run_all_checks() {
     check_bios_tdx_key_split();
     check_bios_enabling_sgx();
     check_bios_sgx_reg_server();
+    check_cpu_manufacturer_id();
+    check_kvm_supported();
+    check_kvm_module_supported(KvmParameter::Tdx);
+    check_kvm_module_supported(KvmParameter::Sgx);
 
     println!();
     println!("Optional Features & Settings");
@@ -384,5 +483,25 @@ mod tests {
     #[test]
     fn test_check_tdx_module() {
         check_tdx_module();
+    }
+
+    #[test]
+    fn test_check_cpu_manufacturer_id() {
+        check_cpu_manufacturer_id();
+    }
+
+    #[test]
+    fn test_check_kvm_supported() {
+        check_kvm_supported();
+    }
+
+    #[test]
+    fn test_check_kvm_module_supported_tdx() {
+        check_kvm_module_supported(KvmParameter::Tdx);
+    }
+
+    #[test]
+    fn test_check_kvm_module_supported_sgx() {
+        check_kvm_module_supported(KvmParameter::Sgx);
     }
 }
