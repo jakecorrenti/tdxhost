@@ -265,6 +265,24 @@ pub fn check_bios_sgx_reg_server() {
     }
 }
 
+pub fn check_cpu_manufacturer_id() {
+    let res = unsafe { std::arch::x86_64::__cpuid(0x0000_0000) };
+    let name: [u8; 12] = unsafe { std::mem::transmute([res.ebx, res.edx, res.ecx]) };
+    let name = String::from_utf8(name.to_vec()).unwrap();
+
+    report_results(
+        if name == "GenuineIntel" {
+            TestResult::Ok
+        } else {
+            TestResult::Failed
+        },
+        "Check CPUID 0x0 Manufacturer ID = GenuineIntel (required)",
+        "The CPUID Manufacturer ID should be GenuineIntel",
+        TestOptionalState::Required,
+        None,
+    );
+}
+
 fn report_results(
     result: TestResult,
     action: &str,
@@ -318,6 +336,7 @@ pub fn run_all_checks() {
     check_bios_tdx_key_split();
     check_bios_enabling_sgx();
     check_bios_sgx_reg_server();
+    check_cpu_manufacturer_id();
 
     println!();
     println!("Optional Features & Settings");
@@ -384,5 +403,10 @@ mod tests {
     #[test]
     fn test_check_tdx_module() {
         check_tdx_module();
+    }
+
+    #[test]
+    fn test_check_cpu_manufacturer_id() {
+        check_cpu_manufacturer_id();
     }
 }
