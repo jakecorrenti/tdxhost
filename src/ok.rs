@@ -7,7 +7,7 @@ use std::process::Command;
 enum TestState {
     Ok,
     #[default]
-    Failed,
+    Fail,
     #[allow(dead_code)]
     Warning,
     Tbd,
@@ -18,7 +18,7 @@ impl From<&TestState> for String {
     fn from(res: &TestState) -> Self {
         match res {
             TestState::Ok => "OK".to_string(),
-            TestState::Failed => "FAILED".to_string(),
+            TestState::Fail => "FAIL".to_string(),
             TestState::Warning => "WARNING".to_string(),
             TestState::Tbd => "TBD".to_string(),
             TestState::Skip => "SKIP".to_string(),
@@ -41,7 +41,7 @@ enum TestOperationState {
 }
 
 #[derive(Debug)]
-pub enum KvmParameter {
+enum KvmParameter {
     Tdx,
     Sgx,
 }
@@ -82,7 +82,7 @@ fn get_os_pretty_name() -> String {
         .to_owned()
 }
 
-pub fn check_os() -> bool {
+fn check_os() -> bool {
     // get os name
     let pretty_name = get_os_pretty_name();
 
@@ -95,7 +95,7 @@ pub fn check_os() -> bool {
     supported
 }
 
-pub fn check_tdx_module() -> bool {
+fn check_tdx_module() -> bool {
     let dmesg_output = Command::new("sudo")
         .arg("dmesg")
         .output()
@@ -107,18 +107,18 @@ pub fn check_tdx_module() -> bool {
     dmesg_output.contains("virt/tdx: module initialized")
 }
 
-pub fn check_bios_tme_bypass() -> bool {
+fn check_bios_tme_bypass() -> bool {
     let msr_value = Msr::new(0x982, 0).unwrap().read().unwrap();
     msr_value & (1 << 31) > 0
 }
 
-pub fn check_cpu_manufacturer_id() -> String {
+fn check_cpu_manufacturer_id() -> String {
     let res = unsafe { std::arch::x86_64::__cpuid(0x0000_0000) };
     let name: [u8; 12] = unsafe { std::mem::transmute([res.ebx, res.edx, res.ecx]) };
     String::from_utf8(name.to_vec()).unwrap()
 }
 
-pub fn check_kvm_supported() -> (TestState, String) {
+fn check_kvm_supported() -> (TestState, String) {
     use std::os::fd::AsRawFd;
 
     match std::fs::File::open("/dev/kvm") {
@@ -126,7 +126,7 @@ pub fn check_kvm_supported() -> (TestState, String) {
             let api_version = unsafe { libc::ioctl(fd.as_raw_fd(), 0xAE00, 0) };
             if api_version < 0 {
                 (
-                    TestState::Failed,
+                    TestState::Fail,
                     String::from("KVM device node (/dev/kvm) should be accessible"),
                 )
             } else {
@@ -134,13 +134,13 @@ pub fn check_kvm_supported() -> (TestState, String) {
             }
         }
         Err(_) => (
-            TestState::Failed,
+            TestState::Fail,
             String::from("Unable to read KVM device node file (/dev/kvm)"),
         ),
     }
 }
 
-pub fn check_kvm_module_supported(param: KvmParameter) -> (TestState, String, String) {
+fn check_kvm_module_supported(param: KvmParameter) -> (TestState, String, String) {
     let param_loc = match param {
         KvmParameter::Tdx => "/sys/module/kvm_intel/parameters/tdx",
         KvmParameter::Sgx => "/sys/module/kvm_intel/parameters/sgx",
@@ -155,7 +155,7 @@ pub fn check_kvm_module_supported(param: KvmParameter) -> (TestState, String, St
                     (TestState::Ok, String::new())
                 } else {
                     (
-                        TestState::Failed,
+                        TestState::Fail,
                         format!(
                             "Parameter file ({}) contains invalid value: {}",
                             param_loc, result
@@ -164,13 +164,13 @@ pub fn check_kvm_module_supported(param: KvmParameter) -> (TestState, String, St
                 }
             }
             Err(e) => (
-                TestState::Failed,
+                TestState::Fail,
                 format!("Unable to read parameter file: {}", e),
             ),
         }
     } else {
         (
-            TestState::Failed,
+            TestState::Fail,
             format!("Provided parameter does not exist: {}", param_loc),
         )
     };
@@ -181,47 +181,6 @@ pub fn check_kvm_module_supported(param: KvmParameter) -> (TestState, String, St
     );
 
     (result, action, reason)
-}
-
-fn report_results(
-    result: TestState,
-    action: &str,
-    reason: &str,
-    optional: TestOptionalState,
-    operation: Option<TestOperationState>,
-) {
-    let mut reason = reason;
-    let res = String::from(&result);
-
-    match result {
-        TestState::Ok => {
-            println!("[ {} ] {}", res.green(), action);
-        }
-        TestState::Warning => {
-            println!("[ {} ] {}", res.magenta(), action);
-            if !reason.is_empty() {
-                println!("\tReason: {}", reason.yellow());
-            }
-        }
-        _ => {
-            let mut color: &str = "red";
-            if let TestOptionalState::Optional = optional {
-                color = "yellow";
-            }
-
-            if operation.is_some() {
-                if let TestOperationState::Manual = operation.unwrap() {
-                    color = "yellow";
-                    reason = "Unable to check in program. Please check manually.";
-                }
-            }
-            println!("[ {} ] {}", res.color(color), action);
-            if !reason.is_empty() {
-                let reason_str = format!("\tReason: {}", reason).color(color);
-                println!("{}", reason_str);
-            }
-        }
-    }
 }
 
 fn report_result(result: &mut TestResult) {
@@ -250,7 +209,7 @@ fn report_result(result: &mut TestResult) {
             if let TestOperationState::Manual = result.operation {
                 color = "yellow";
 
-                if let TestState::Failed = result.state {
+                if let TestState::Fail = result.state {
                     color = "red";
                 }
 
@@ -299,7 +258,7 @@ fn run_test(tests: &[Test]) -> bool {
                     passed = false;
                 }
             }
-            TestState::Failed => {
+            TestState::Fail => {
                 passed = false;
                 report_skip_result(&t.sub_tests);
             }
@@ -351,7 +310,7 @@ fn get_optional_tests() -> Vec<Test> {
             let state = if check_bios_tme_bypass() {
                 TestState::Ok
             } else {
-                TestState::Failed
+                TestState::Fail
             };
 
             TestResult {
@@ -419,7 +378,7 @@ fn get_required_tests() -> Vec<Test> {
             let state = if msr_value & (1 << 11) > 0 {
                 TestState::Ok
             } else {
-                TestState::Failed
+                TestState::Fail
             };
             TestResult {
                 action: String::from("Check BIOS: TDX = Enabled"),
@@ -436,7 +395,7 @@ fn get_required_tests() -> Vec<Test> {
                     let state = if module_initialized {
                         TestState::Ok
                     } else {
-                        TestState::Failed
+                        TestState::Fail
                     };
                     TestResult {
                         action: String::from("Check TDX Module: The module is initialized"),
@@ -455,7 +414,7 @@ fn get_required_tests() -> Vec<Test> {
                     let state = if msr_value & (1 << 1) > 0 {
                         TestState::Ok
                     } else {
-                        TestState::Failed
+                        TestState::Fail
                     };
                     TestResult {
                         action: String::from("Check BIOS: TME = Enabled"),
@@ -474,7 +433,7 @@ fn get_required_tests() -> Vec<Test> {
                     let state = if msr_value & (1 << 1) > 0 {
                         TestState::Tbd
                     } else {
-                        TestState::Failed
+                        TestState::Fail
                     };
                     TestResult {
                         action: String::from("Check BIOS: TME-MT/TME-MK = Enabled"),
@@ -503,7 +462,7 @@ fn get_required_tests() -> Vec<Test> {
                     let state = if msr_value & (0x7fff << 36) != 0 {
                         TestState::Ok
                     } else {
-                        TestState::Failed
+                        TestState::Fail
                     };
                     TestResult {
                         action: String::from("Check BIOS: TDX Key Split != 0"),
@@ -545,7 +504,7 @@ fn get_required_tests() -> Vec<Test> {
             let state = if msr_value & (1 << 18) > 0 {
                 TestState::Ok
             } else {
-                TestState::Failed
+                TestState::Fail
             };
             TestResult {
                 action: String::from("Check BIOS: SGX = Enabled"),
@@ -565,7 +524,7 @@ fn get_required_tests() -> Vec<Test> {
             let state = if supported {
                 TestState::Ok
             } else {
-                TestState::Failed
+                TestState::Fail
             };
             TestResult {
                 action: String::from("Check OS: The distro and version are correct"),
@@ -593,7 +552,7 @@ fn get_required_tests() -> Vec<Test> {
             let state = if manu_name == "GenuineIntel" {
                 TestState::Ok
             } else {
-                TestState::Failed
+                TestState::Fail
             };
             TestResult {
                 action: String::from("Check CPUID 0x0 Manufacturer ID = GenuineIntel"),
